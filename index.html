@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swing Signal Terminal | TOPIX(1306) × Gold(314A)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#12151A;
+  --panel:#1B1F27;
+  --panel-2:#20242D;
+  --line:#2B303B;
+  --text:#E8E9ED;
+  --muted:#8A8F98;
+  --buy:#3DDC84;
+  --sell:#FF5C5C;
+  --wait:#F0B429;
+  --accent:#5B8CFF;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'IBM Plex Sans JP', sans-serif;
+  min-height:100vh;
+}
+::selection{background:var(--accent);color:#000;}
+.topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:18px 24px;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:rgba(18,21,26,0.92);backdrop-filter:blur(6px);z-index:10;
+  flex-wrap:wrap;gap:10px;
+}
+.brand{display:flex;align-items:baseline;gap:10px;}
+.brand h1{
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:0.02em;margin:0;
+}
+.brand span.tag{
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
+  border:1px solid var(--line);padding:2px 6px;border-radius:3px;
+}
+.topbar .meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);text-align:right;}
+.container{max-width:1180px;margin:0 auto;padding:24px;}
+.rules-note{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:14px 18px;margin-bottom:22px;font-size:13px;line-height:1.7;color:var(--muted);
+}
+.rules-note b{color:var(--text);}
+.grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:20px;
+}
+@media (max-width:880px){.grid{grid-template-columns:1fr;}}
+
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px;position:relative;overflow:hidden;
+}
+.panel-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.instrument-name{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;}
+.instrument-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.price{
+  font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;
+  margin:6px 0 2px 0;
+}
+.price-delta{font-family:'JetBrains Mono',monospace;font-size:13px;}
+.up{color:var(--buy);} .down{color:var(--sell);} .flat{color:var(--muted);}
+
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+  padding:6px 12px;border-radius:20px;letter-spacing:0.03em;
+}
+.badge.WAIT{background:rgba(240,180,41,0.12);color:var(--wait);border:1px solid rgba(240,180,41,0.4);}
+.badge.BUY{background:rgba(61,220,132,0.12);color:var(--buy);border:1px solid rgba(61,220,132,0.4);}
+.badge.SELL{background:rgba(255,92,92,0.12);color:var(--sell);border:1px solid rgba(255,92,92,0.4);}
+.badge.HOLD{background:rgba(91,140,255,0.12);color:var(--accent);border:1px solid rgba(91,140,255,0.4);}
+
+/* Lot gauge — signature element */
+.lot-gauge{display:flex;gap:6px;margin:14px 0;}
+.lot-seg{
+  flex:1;height:10px;border-radius:3px;background:var(--panel-2);
+  border:1px solid var(--line);position:relative;overflow:hidden;
+}
+.lot-seg.filled{background:linear-gradient(90deg,var(--buy),#2bb867);border-color:var(--buy);}
+.lot-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:6px;}
+
+.action-msg{
+  font-size:13.5px;line-height:1.65;background:var(--panel-2);border-left:3px solid var(--accent);
+  border-radius:6px;padding:12px 14px;margin:14px 0;
+}
+.action-msg.BUY{border-left-color:var(--buy);}
+.action-msg.SELL{border-left-color:var(--sell);}
+.action-msg.WAIT{border-left-color:var(--wait);}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;margin:14px 0;}
+.stats div span{color:var(--muted);display:block;font-size:10px;margin-bottom:2px;}
+
+canvas{width:100%!important;max-height:160px;margin:10px 0;}
+
+.log{max-height:150px;overflow-y:auto;border-top:1px solid var(--line);padding-top:10px;margin-top:10px;}
+.log-row{
+  display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;
+  font-size:11px;padding:4px 0;border-bottom:1px dashed var(--line);color:var(--muted);
+}
+.log-row b{color:var(--text);}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+button{
+  background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:8px 12px;font-family:'IBM Plex Sans JP',sans-serif;
+  font-size:12px;cursor:pointer;transition:border-color .15s,background .15s;
+}
+button:hover{border-color:var(--accent);}
+button.primary{background:var(--accent);border-color:var(--accent);color:#0A0D12;font-weight:700;}
+button.danger{color:var(--sell);}
+button:disabled{opacity:0.4;cursor:not-allowed;}
+
+.manual-box{display:none;margin-top:10px;gap:8px;flex-direction:column;}
+.manual-box.open{display:flex;}
+.manual-box textarea{
+  background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:6px;
+  padding:8px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:70px;
+}
+.manual-box input{
+  background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:6px;
+  padding:8px;font-family:'JetBrains Mono',monospace;font-size:12px;
+}
+.error{color:var(--sell);font-size:12px;margin-top:8px;}
+.footer{
+  max-width:1180px;margin:30px auto;padding:0 24px 40px;font-size:11.5px;color:var(--muted);line-height:1.8;
+}
+.footer h3{font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--text);margin-bottom:6px;}
+a{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <h1>SWING SIGNAL TERMINAL</h1>
+    <span class="tag">損小利大 / ピラミッディング型</span>
+  </div>
+  <div class="meta" id="lastUpdate">未取得</div>
+</div>
+
+<div class="container">
+  <div class="rules-note">
+    <b>ルール概要:</b> トレンドフィルター（SMA25/75）が上向きの時のみ押し目からの反発でエントリー（1ロット）。含み益がATRの1倍進むごとに追加購入（最大3ロット）でピラミッディング。含み益がATRの2.5倍に到達した古いロットから利益確定売り。損切りは初回エントリーからATRの1.5倍下、または25日線割れ＋MACD弱転で残りロットを手仕舞い。<b>空売りは行いません（買い・利確・損切りのみ）。</b>
+    データは日次終値ベース（前営業日終了時点）。ザラ場リアルタイムのティックではなく、スイング向けの日足シグナルです。314Aは上場来が短いため、価格連動性の高い金先物価格（GC=F・米ドル建て）で代用してシグナルを算出しています。データはYahoo!ファイナンスのチャートAPIを無料の中継サーバー（CORSプロキシ）経由で取得しています。ブラウザから金融データサイトへ直接アクセスするとCORS制限で拒否されるため、静的サイトではこの方式が最も現実的ですが、中継サーバーが一時的に不調な場合は自動取得に失敗することがあります。その場合は各カードの「手動入力/貼付」をご利用ください。</div>
+
+  <div class="grid" id="panels"></div>
+</div>
+
+<div class="footer">
+  <h3>免責事項</h3>
+  本アプリは特定の売買を推奨するものではなく、教育・検証目的のテクニカルシグナル表示ツールです。投資判断はご自身の責任で行ってください。データ取得元（Yahoo!ファイナンス、および中継に用いる無料CORSプロキシ）の遅延・欠損・仕様変更・一時停止により、シグナルが実際の市況と乖離したり自動取得が失敗したりする可能性があります。ブラウザのlocalStorageにポジション状態を保存しているため、端末やブラウザを変えると保有ロット状況は引き継がれません。
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const INSTRUMENTS = [
+  {
+    key: '1306',
+    name: 'TOPIX連動型ETF',
+    ticker: '1306',
+    yahooSymbol: '1306.T',
+    currency: '円',
+    note: 'TOPIX ETF（東証）'
+  },
+  {
+    key: '314A',
+    name: 'ゴールドETF（金価格代用）',
+    ticker: '314A',
+    yahooSymbol: 'GC=F',
+    currency: 'USD/oz',
+    note: '314Aは上場来データ不足のため金先物価格(GC=F/USD)で代替算出'
+  }
+];
+
+const RULE = {
+  smaTrendFast: 25,
+  smaTrendSlow: 75,
+  atrPeriod: 14,
+  rsiPeriod: 14,
+  hardStopATR: 1.5,
+  pyramidStepATR: 1.0,
+  partialTakeATR: 2.5,
+  trailATR: 3.0,
+  rsiOverbought: 75,
+  rsiPullbackTrigger: 40,
+  rsiTriggerMax: 65,
+  rsiDeepPullback: 35,
+  rsiLookbackDays: 10,
+  maxLots: 3
+};
+
+/* ============ INDICATOR MATH ============ */
+function sma(vals, period, i){
+  if(i < period-1) return null;
+  let s=0; for(let k=i-period+1;k<=i;k++) s+=vals[k];
+  return s/period;
+}
+function emaArray(vals, period){
+  const k = 2/(period+1);
+  const out = new Array(vals.length).fill(null);
+  let prev=null;
+  for(let i=0;i<vals.length;i++){
+    if(i===period-1){
+      let s=0; for(let j=0;j<period;j++) s+=vals[j];
+      prev = s/period; out[i]=prev;
+    } else if(i>=period){
+      prev = vals[i]*k + prev*(1-k); out[i]=prev;
+    }
+  }
+  return out;
+}
+function computeIndicators(candles){
+  const n = candles.length;
+  const closes = candles.map(c=>c.close);
+  const highs = candles.map(c=>c.high);
+  const lows = candles.map(c=>c.low);
+
+  const sma25 = new Array(n).fill(null);
+  const sma75 = new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    sma25[i]=sma(closes,RULE.smaTrendFast,i);
+    sma75[i]=sma(closes,RULE.smaTrendSlow,i);
+  }
+
+  // Wilder ATR
+  const tr = new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    if(i===0){ tr[i]=highs[i]-lows[i]; continue; }
+    tr[i]=Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1]));
+  }
+  const atr = new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    if(i===RULE.atrPeriod-1){
+      let s=0; for(let j=0;j<=i;j++) s+=tr[j];
+      atr[i]=s/RULE.atrPeriod;
+    } else if(i>=RULE.atrPeriod){
+      atr[i]=(atr[i-1]*(RULE.atrPeriod-1)+tr[i])/RULE.atrPeriod;
+    }
+  }
+
+  // Wilder RSI
+  const rsi = new Array(n).fill(null);
+  let avgGain=null, avgLoss=null;
+  for(let i=1;i<n;i++){
+    const change = closes[i]-closes[i-1];
+    const gain = Math.max(change,0);
+    const loss = Math.max(-change,0);
+    if(i===RULE.rsiPeriod){
+      let sg=0, sl=0;
+      for(let j=1;j<=RULE.rsiPeriod;j++){
+        const ch=closes[j]-closes[j-1];
+        sg+=Math.max(ch,0); sl+=Math.max(-ch,0);
+      }
+      avgGain=sg/RULE.rsiPeriod; avgLoss=sl/RULE.rsiPeriod;
+      rsi[i]= avgLoss===0?100:100-(100/(1+avgGain/avgLoss));
+    } else if(i>RULE.rsiPeriod){
+      avgGain=(avgGain*(RULE.rsiPeriod-1)+gain)/RULE.rsiPeriod;
+      avgLoss=(avgLoss*(RULE.rsiPeriod-1)+loss)/RULE.rsiPeriod;
+      rsi[i]= avgLoss===0?100:100-(100/(1+avgGain/avgLoss));
+    }
+  }
+
+  // MACD
+  const ema12 = emaArray(closes,12);
+  const ema26 = emaArray(closes,26);
+  const macdLine = closes.map((_,i)=> (ema12[i]!==null && ema26[i]!==null)? ema12[i]-ema26[i] : null);
+  const macdValid = macdLine.filter(v=>v!==null);
+  const signalOnValid = emaArray(macdValid,9);
+  const signalLine = new Array(n).fill(null);
+  let vi=0;
+  for(let i=0;i<n;i++){
+    if(macdLine[i]!==null){ signalLine[i]=signalOnValid[vi]; vi++; }
+  }
+  const hist = closes.map((_,i)=> (macdLine[i]!==null && signalLine[i]!==null)? macdLine[i]-signalLine[i] : null);
+
+  return {sma25, sma75, atr, rsi, macdHist:hist};
+}
+
+/* ============ SIGNAL ENGINE ============ */
+function loadState(key){
+  try{
+    const raw = localStorage.getItem('swingsignal_'+key);
+    if(!raw) return {lots:[], highestHigh:null, lastAddPrice:null, hardStop:null, log:[]};
+    return JSON.parse(raw);
+  }catch(e){ return {lots:[], highestHigh:null, lastAddPrice:null, hardStop:null, log:[]}; }
+}
+function saveState(key,state){
+  localStorage.setItem('swingsignal_'+key, JSON.stringify(state));
+}
+
+function pushLog(state,date,action,price,note){
+  state.log.unshift({date,action,price,lots:state.lots.length,note});
+  if(state.log.length>60) state.log.length=60;
+}
+
+function runEngine(candles, indicators, state){
+  const n = candles.length;
+  const i = n-1, p = n-2;
+  const close = candles[i].close, high = candles[i].high, date = candles[i].date;
+  const sma25=indicators.sma25[i], sma75=indicators.sma75[i];
+  const atr = indicators.atr[i];
+  const rsi = indicators.rsi[i], rsiPrev = indicators.rsi[p];
+  const macdHist = indicators.macdHist[i], macdHistPrev = indicators.macdHist[p];
+
+  if(sma25===null||sma75===null||atr===null||rsi===null||macdHist===null){
+    return {action:'WAIT', badge:'WAIT', message:'データ不足のため指標を計算中です（過去データを十分に取得できていません）。', indicators:{sma25,sma75,atr,rsi,macdHist}};
+  }
+
+  const uptrend = close>sma75 && sma25>sma75;
+  let action='WAIT', message='', badgeClass='WAIT';
+
+  if(state.lots.length===0){
+    let recentDip=false;
+    for(let k=Math.max(0,i-RULE.rsiLookbackDays); k<i; k++){
+      if(indicators.rsi[k]!==null && indicators.rsi[k]<RULE.rsiDeepPullback){ recentDip=true; break; }
+    }
+    const trigger = uptrend && recentDip && rsi>=RULE.rsiPullbackTrigger && rsi<=RULE.rsiTriggerMax && close>sma25;
+    if(trigger){
+      const entryPrice=close;
+      const hardStop = entryPrice - RULE.hardStopATR*atr;
+      state.lots.push({entryPrice, entryDate:date, atrAtEntry:atr});
+      state.highestHigh = high;
+      state.lastAddPrice = entryPrice;
+      state.hardStop = hardStop;
+      pushLog(state,date,'BUY',entryPrice,'新規エントリー(ロット1)');
+      action='BUY'; badgeClass='BUY';
+      message = `新規買いエントリー（ロット1/${RULE.maxLots}）。上昇トレンド中に押し目（RSI${RULE.rsiDeepPullback}未満）からRSIが${RULE.rsiPullbackTrigger}台まで回復し、終値がSMA25を上回りました。損切りライン: ${hardStop.toFixed(2)}（ATR×${RULE.hardStopATR}下）。`;
+    } else {
+      badgeClass='WAIT';
+      message = uptrend
+        ? (recentDip
+            ? `押し目からの回復途中です。終値がSMA25を上回るのを待っています。現在RSI: ${rsi.toFixed(1)}`
+            : `上昇トレンド継続中。十分な押し目（RSI${RULE.rsiDeepPullback}未満）がまだ発生していません。現在RSI: ${rsi.toFixed(1)}`)
+        : `トレンドフィルター未成立（終値がSMA75未満、またはSMA25がSMA75を下回る）。新規エントリーは見送りです。`;
+    }
+  } else {
+    state.highestHigh = Math.max(state.highestHigh, high);
+    const trailStop = state.highestHigh - RULE.trailATR*atr;
+    const bearishCross = macdHistPrev!==null && macdHistPrev>=0 && macdHist<0;
+
+    if(close<=state.hardStop){
+      const exitLots = state.lots.length;
+      pushLog(state,date,'SELL',close,`損切り(全${exitLots}ロット)`);
+      action='SELL'; badgeClass='SELL';
+      message = `損切りライン(${state.hardStop.toFixed(2)})を割り込みました。保有${exitLots}ロットすべてを成行で手仕舞いしてください。`;
+      state.lots=[]; state.highestHigh=null; state.lastAddPrice=null; state.hardStop=null;
+    } else if(close<trailStop || (close<sma25 && bearishCross)){
+      const exitLots = state.lots.length;
+      const reason = close<trailStop ? `トレーリングストップ(${trailStop.toFixed(2)})到達` : `25日線割れ＋MACD弱転`;
+      pushLog(state,date,'SELL',close,`トレンド終了(全${exitLots}ロット) - ${reason}`);
+      action='SELL'; badgeClass='SELL';
+      message = `${reason}。残り${exitLots}ロットすべてを手仕舞いし、利益を確定してください。`;
+      state.lots=[]; state.highestHigh=null; state.lastAddPrice=null; state.hardStop=null;
+    } else if(state.lots.length<RULE.maxLots && uptrend && (close-state.lastAddPrice)>=RULE.pyramidStepATR*atr && close>sma25){
+      state.lots.push({entryPrice:close, entryDate:date, atrAtEntry:atr});
+      state.lastAddPrice=close;
+      pushLog(state,date,'BUY',close,`追加買い(ピラミッド ロット${state.lots.length}/${RULE.maxLots})`);
+      action='BUY'; badgeClass='BUY';
+      message = `含み益がATR×${RULE.pyramidStepATR}進んだためピラミッディング。ロット${state.lots.length}/${RULE.maxLots}を追加購入してください。`;
+    } else if(state.lots.length>=2){
+      const oldest = state.lots[0];
+      const gain = close - oldest.entryPrice;
+      const freshOverbought = rsi>=RULE.rsiOverbought && !(rsiPrev!==null && rsiPrev>=RULE.rsiOverbought);
+      if(gain>=RULE.partialTakeATR*oldest.atrAtEntry || freshOverbought){
+        state.lots.shift();
+        const reason = freshOverbought ? `RSI過熱(${rsi.toFixed(1)})` : `含み益がATR×${RULE.partialTakeATR}到達`;
+        pushLog(state,date,'SELL',close,`一部利確(ロット1本 売却) - ${reason}`);
+        action='SELL'; badgeClass='SELL';
+        message = `${reason}。最も古いロットを1本利益確定売りしてください。残り${state.lots.length}ロットはトレーリングストップで継続保有。`;
+      } else {
+        badgeClass='HOLD';
+        message = `保有継続中（${state.lots.length}ロット）。含み損益・トレーリングストップを監視しています。`;
+        action='HOLD';
+      }
+    } else {
+      badgeClass='HOLD';
+      message = `保有継続中（${state.lots.length}ロット）。トレーリングストップ: ${trailStop.toFixed(2)} / 損切りライン: ${state.hardStop.toFixed(2)}`;
+      action='HOLD';
+    }
+  }
+
+  saveState('placeholder', state); // overwritten by caller with correct key
+  return {action, badge:badgeClass, message, indicators:{sma25,sma75,atr,rsi,macdHist}, trailStop: state.lots.length? state.highestHigh-RULE.trailATR*atr : null};
+}
+
+/* ============ DATA FETCH ============ */
+// Generic OHLCV CSV parser, used for the manual paste fallback (Date,Open,High,Low,Close,Volume)
+function parseCSV(text){
+  const lines = text.trim().split('\n');
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const parts = lines[i].split(',');
+    if(parts.length<6) continue;
+    const [date,open,high,low,close,volume]=parts;
+    if(!date || isNaN(parseFloat(close))) continue;
+    rows.push({date, open:parseFloat(open), high:parseFloat(high), low:parseFloat(low), close:parseFloat(close), volume:parseFloat(volume)});
+  }
+  return rows;
+}
+
+// Yahoo Finance's v8 chart endpoint returns clean OHLCV JSON and covers Tokyo-listed
+// tickers and futures, but (like most finance data hosts) it does not send
+// Access-Control-Allow-Origin headers, so a static page cannot fetch it directly.
+// We relay the request through public CORS proxies, trying each until one works.
+const CORS_PROXIES = [
+  (u)=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u)=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  (u)=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`
+];
+
+function parseYahooChart(json){
+  const result = json && json.chart && json.chart.result && json.chart.result[0];
+  if(!result) throw new Error('Yahoo Financeのレスポンス形式が想定外です');
+  const ts = result.timestamp;
+  const q = result.indicators.quote[0];
+  if(!ts || !q) throw new Error('価格データが含まれていません');
+  const rows=[];
+  for(let i=0;i<ts.length;i++){
+    const c=q.close[i], o=q.open[i], h=q.high[i], l=q.low[i], v=q.volume[i];
+    if(c===null || c===undefined) continue;
+    const date = new Date(ts[i]*1000).toISOString().slice(0,10);
+    rows.push({date, open:o??c, high:h??c, low:l??c, close:c, volume:v??0});
+  }
+  return rows;
+}
+
+async function fetchYahoo(symbol){
+  const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1d`;
+  let lastErr = null;
+  for(const wrap of CORS_PROXIES){
+    try{
+      const res = await fetch(wrap(target));
+      if(!res.ok) throw new Error('HTTPエラー: '+res.status);
+      const text = await res.text();
+      let json;
+      try{ json = JSON.parse(text); }
+      catch(e){ throw new Error('JSON解析に失敗（プロキシ経由のレスポンス異常）'); }
+      const rows = parseYahooChart(json);
+      if(rows.length<80) throw new Error('データ件数が不足しています');
+      return rows;
+    }catch(e){ lastErr = e; continue; }
+  }
+  throw new Error('全てのデータ経路で取得に失敗しました（'+(lastErr?lastErr.message:'不明なエラー')+'）');
+}
+
+/* ============ UI RENDER ============ */
+const charts = {};
+
+function renderPanel(inst){
+  const el = document.createElement('div');
+  el.className='panel';
+  el.id='panel-'+inst.key;
+  el.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <div class="instrument-name">${inst.ticker} ${inst.name}</div>
+        <div class="instrument-sub">${inst.note}</div>
+      </div>
+      <span class="badge WAIT" id="badge-${inst.key}">読込中</span>
+    </div>
+    <div class="price" id="price-${inst.key}">--</div>
+    <div class="price-delta flat" id="delta-${inst.key}">--</div>
+
+    <div class="lot-gauge" id="gauge-${inst.key}">
+      <div class="lot-seg"></div><div class="lot-seg"></div><div class="lot-seg"></div>
+    </div>
+    <div class="lot-label" id="gaugeLabel-${inst.key}">保有ロット: 0/3</div>
+
+    <div class="action-msg WAIT" id="msg-${inst.key}">データ取得中です…</div>
+
+    <div class="stats" id="stats-${inst.key}"></div>
+
+    <canvas id="chart-${inst.key}"></canvas>
+
+    <div class="controls">
+      <button class="primary" onclick="loadInstrument('${inst.key}')">データ更新</button>
+      <button onclick="toggleManual('${inst.key}')">手動入力/貼付</button>
+      <button class="danger" onclick="resetPosition('${inst.key}')">ポジションをリセット</button>
+    </div>
+
+    <div class="manual-box" id="manual-${inst.key}">
+      <div style="font-size:11px;color:var(--muted);">自動取得に失敗した場合、Yahoo!ファイナンス等の「時系列データ」CSV（Date,Open,High,Low,Close,Volume）を貼り付けるか、直近終値のみ入力してください。</div>
+      <textarea id="manualCsv-${inst.key}" placeholder="Date,Open,High,Low,Close,Volume&#10;2026-07-01,...,...,...,...,..."></textarea>
+      <input id="manualClose-${inst.key}" placeholder="直近終値のみ入力する場合はここに数値">
+      <button onclick="applyManual('${inst.key}')">この内容で反映</button>
+    </div>
+
+    <div class="log" id="log-${inst.key}"></div>
+  `;
+  document.getElementById('panels').appendChild(el);
+}
+
+function updateGauge(key,count){
+  const gauge = document.getElementById('gauge-'+key);
+  const segs = gauge.querySelectorAll('.lot-seg');
+  segs.forEach((s,idx)=> s.classList.toggle('filled', idx<count));
+  document.getElementById('gaugeLabel-'+key).textContent = `保有ロット: ${count}/${RULE.maxLots}`;
+}
+
+function renderChart(key,candles){
+  const ctx = document.getElementById('chart-'+key);
+  const labels = candles.slice(-90).map(c=>c.date.slice(5));
+  const data = candles.slice(-90).map(c=>c.close);
+  if(charts[key]) charts[key].destroy();
+  charts[key] = new Chart(ctx,{
+    type:'line',
+    data:{labels, datasets:[{data, borderColor:'#5B8CFF', borderWidth:1.5, pointRadius:0, tension:0.15, fill:false}]},
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{display:false},
+        y:{ticks:{color:'#8A8F98',font:{size:9}}, grid:{color:'#2B303B'}}
+      }
+    }
+  });
+}
+
+function renderLog(key,log){
+  const el = document.getElementById('log-'+key);
+  if(!log.length){ el.innerHTML='<div style="font-size:11px;color:var(--muted);">シグナル履歴はまだありません。</div>'; return; }
+  el.innerHTML = log.slice(0,10).map(r=>`
+    <div class="log-row"><span>${r.date}</span><b>${r.action}</b><span>${r.price.toFixed(2)}</span><span>${r.note}</span></div>
+  `).join('');
+}
+
+function showError(key,msg){
+  const box = document.getElementById('panel-'+key);
+  let err = box.querySelector('.error');
+  if(!err){ err=document.createElement('div'); err.className='error'; box.appendChild(err); }
+  err.textContent = 'エラー: '+msg+' 「手動入力/貼付」から続行できます。';
+}
+
+function toggleManual(key){
+  document.getElementById('manual-'+key).classList.toggle('open');
+}
+
+function resetPosition(key){
+  if(!confirm('このポジション記録をリセットします。よろしいですか？')) return;
+  localStorage.removeItem('swingsignal_'+key);
+  loadInstrument(key);
+}
+
+function applyManual(key){
+  const inst = INSTRUMENTS.find(x=>x.key===key);
+  const csvText = document.getElementById('manualCsv-'+key).value.trim();
+  const closeOnly = document.getElementById('manualClose-'+key).value.trim();
+  let candles = window['__cache_'+key];
+  try{
+    if(csvText){
+      const rows = parseCSV('Date,Open,High,Low,Close,Volume\n'+csvText);
+      if(rows.length<80) throw new Error('貼り付けデータが不足しています(80日分以上必要)');
+      candles = rows;
+    } else if(closeOnly){
+      const v = parseFloat(closeOnly);
+      if(isNaN(v)) throw new Error('数値を入力してください');
+      if(!candles) throw new Error('先に一度データ更新を試みてください');
+      const today = new Date().toISOString().slice(0,10);
+      candles = candles.concat([{date:today, open:v, high:v, low:v, close:v, volume:0}]);
+    } else {
+      throw new Error('CSVまたは終値のいずれかを入力してください');
+    }
+    processInstrument(inst, candles);
+    document.getElementById('manual-'+key).classList.remove('open');
+  }catch(e){
+    showError(key, e.message);
+  }
+}
+
+function processInstrument(inst, candles){
+  window['__cache_'+inst.key] = candles;
+  const indicators = computeIndicators(candles);
+  const state = loadState(inst.key);
+  const result = runEngine(candles, indicators, state);
+  saveState(inst.key, state);
+
+  const last = candles[candles.length-1];
+  const prev = candles[candles.length-2];
+  const delta = last.close-prev.close;
+  const deltaPct = (delta/prev.close*100).toFixed(2);
+
+  document.getElementById('price-'+inst.key).textContent = last.close.toFixed(2)+' '+inst.currency;
+  const deltaEl = document.getElementById('delta-'+inst.key);
+  deltaEl.textContent = `${delta>=0?'+':''}${delta.toFixed(2)} (${delta>=0?'+':''}${deltaPct}%) 前日比`;
+  deltaEl.className = 'price-delta '+(delta>0?'up':delta<0?'down':'flat');
+
+  const badge = document.getElementById('badge-'+inst.key);
+  badge.textContent = result.action==='HOLD' ? '保有中' : result.action==='BUY' ? '買いシグナル' : result.action==='SELL' ? '売りシグナル' : '待機';
+  badge.className = 'badge '+result.badge;
+
+  document.getElementById('msg-'+inst.key).textContent = result.message;
+  document.getElementById('msg-'+inst.key).className = 'action-msg '+result.badge;
+
+  updateGauge(inst.key, state.lots.length);
+
+  const stats = document.getElementById('stats-'+inst.key);
+  const ind = result.indicators;
+  stats.innerHTML = `
+    <div><span>SMA25</span>${ind.sma25?ind.sma25.toFixed(2):'-'}</div>
+    <div><span>SMA75</span>${ind.sma75?ind.sma75.toFixed(2):'-'}</div>
+    <div><span>ATR14</span>${ind.atr?ind.atr.toFixed(2):'-'}</div>
+    <div><span>RSI14</span>${ind.rsi?ind.rsi.toFixed(1):'-'}</div>
+    <div><span>損切りライン</span>${state.hardStop?state.hardStop.toFixed(2):'-'}</div>
+    <div><span>トレーリング</span>${result.trailStop?result.trailStop.toFixed(2):'-'}</div>
+  `;
+
+  renderChart(inst.key, candles);
+  renderLog(inst.key, state.log);
+
+  const err = document.querySelector('#panel-'+inst.key+' .error');
+  if(err) err.remove();
+
+  document.getElementById('lastUpdate').textContent = '最終更新: '+new Date().toLocaleString('ja-JP');
+}
+
+async function loadInstrument(key){
+  const inst = INSTRUMENTS.find(x=>x.key===key);
+  try{
+    const candles = await fetchYahoo(inst.yahooSymbol);
+    processInstrument(inst, candles);
+  }catch(e){
+    showError(key, e.message);
+    document.getElementById('badge-'+key).textContent='取得失敗';
+    document.getElementById('badge-'+key).className='badge SELL';
+    document.getElementById('msg-'+key).textContent = 'データの自動取得に失敗しました。ネットワーク/CORS設定、またはシンボル指定をご確認のうえ、下部の「手動入力/貼付」もご利用いただけます。';
+  }
+}
+
+function init(){
+  INSTRUMENTS.forEach(renderPanel);
+  INSTRUMENTS.forEach(inst=>loadInstrument(inst.key));
+}
+init();
+</script>
+</body>
+</html>
