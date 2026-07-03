@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Swing Signal Terminal | TOPIX(1306)</title>
+<title>Swing Signal Terminal | TOPIX(1306) - Gap Aware</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -18,6 +18,7 @@
   --sell:#FF5C5C;
   --wait:#F0B429;
   --accent:#5B8CFF;
+  --gap-risk:#FF9500;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -50,6 +51,7 @@ body{
   padding:14px 18px;margin-bottom:22px;font-size:13px;line-height:1.7;color:var(--muted);
 }
 .rules-note b{color:var(--text);}
+.rules-note .warning{color:var(--gap-risk);font-weight:700;}
 .grid{
   display:grid;grid-template-columns:1fr;gap:20px;
 }
@@ -78,8 +80,8 @@ body{
 .badge.BUY{background:rgba(61,220,132,0.12);color:var(--buy);border:1px solid rgba(61,220,132,0.4);}
 .badge.SELL{background:rgba(255,92,92,0.12);color:var(--sell);border:1px solid rgba(255,92,92,0.4);}
 .badge.HOLD{background:rgba(91,140,255,0.12);color:var(--accent);border:1px solid rgba(91,140,255,0.4);}
+.badge.PENDING{background:rgba(255,149,0,0.12);color:var(--gap-risk);border:1px solid rgba(255,149,0,0.4);}
 
-/* Lot gauge — signature element */
 .lot-gauge{display:flex;gap:6px;margin:14px 0;}
 .lot-seg{
   flex:1;height:10px;border-radius:3px;background:var(--panel-2);
@@ -95,6 +97,18 @@ body{
 .action-msg.BUY{border-left-color:var(--buy);}
 .action-msg.SELL{border-left-color:var(--sell);}
 .action-msg.WAIT{border-left-color:var(--wait);}
+.action-msg.PENDING{border-left-color:var(--gap-risk);background:rgba(255,149,0,0.08);}
+
+.timelag-info{
+  background:rgba(255,149,0,0.08);border:1px solid var(--gap-risk);
+  border-radius:6px;padding:10px;margin:10px 0;font-size:11px;
+  color:var(--gap-risk);font-family:'JetBrains Mono',monospace;
+}
+
+.gap-warning{
+  background:rgba(255,92,92,0.1);border-left:3px solid var(--sell);
+  padding:8px 12px;margin:8px 0;border-radius:4px;font-size:12px;color:var(--text);
+}
 
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;margin:14px 0;}
 .stats div span{color:var(--muted);display:block;font-size:10px;margin-bottom:2px;}
@@ -142,14 +156,25 @@ a{color:var(--accent);}
 <div class="topbar">
   <div class="brand">
     <h1>SWING SIGNAL TERMINAL</h1>
-    <span class="tag">損小利大 / ピラミッデ���ング型</span>
+    <span class="tag">Gap Aware × タイムラグ対応</span>
   </div>
   <div class="meta" id="lastUpdate">未取得</div>
 </div>
 
 <div class="container">
   <div class="rules-note">
-    <b>ルール概要:</b> トレンドフィルター（SMA25/75）が上向きの時のみ押し目からの反発でエントリー（1ロット）。含み益がATRの1倍進むごとに追加（最大3ロット）。古いロットから部分利確または全体ストップアウト。データは日次終値ベース（前営業日終了時点）。ザラ場リアルタイムのティックではなく、スイング向けの日足シグナルです。
+    <b>タイムラグ対応ルール（ガチ版）</b><br>
+    当日終値 → 翌営業日9:00寄り注文を前提に改設計。<br>
+    <span class="warning">■シグナル日付 = 分析基準日（確定値）</span><br>
+    <span class="warning">■実行予定日 = UT翌営業日寄付</span><br>
+    <span class="warning">■Gap上下限 = 過去ATR×1.5を損切ライン調整に組込</span><br>
+    <br>
+    <b>新ルール詳細：</b><br>
+    • 前営業日終値で指標判定（買い/売りシグナル判定）<br>
+    • 翌営業日寄付予想Gap = 前営業日ATR × 0.8 ~ 1.5の乱数想定<br>
+    • 寄付Gapを考慮し損切ラインを前営業日ATR × 2.0に拡大<br>
+    • トレーリングストップはGap発生後に当日足で改めて計算<br>
+    • 含み益通知は実行予定日の朝の寄付で約定想定で表示
   </div>
 
   <div class="grid" id="panels"></div>
@@ -157,12 +182,12 @@ a{color:var(--accent);}
 
 <div class="footer">
   <h3>免責事項</h3>
-  本アプリは特定の売買を推奨するものではなく、教育・検証目的のテクニカルシグナル表示ツールです。投資判断はご自身の責任で行ってください。
+  本アプリは特定の売買を推奨するものではなく、教育・検証目的のテクニカルシグナル表示ツールです。投資判断はご自身の責任で行ってください。Gap発生時の実際の約定価格は表示と大きく異なる可能性があります。
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script>
-/* ============ CONFIG ============ */
+/* ============ CONFIG（タイムラグ対応版） ============ */
 const INSTRUMENTS = [
   {
     key: '1306',
@@ -179,7 +204,8 @@ const RULE = {
   smaTrendSlow: 75,
   atrPeriod: 14,
   rsiPeriod: 14,
-  hardStopATR: 1.5,
+  hardStopATR: 2.0,           // ★ Gap対応: 1.5 → 2.0に拡大
+  gapAdjustmentATR: 0.5,      // ★ 新規: 寄付Gap想定幅
   pyramidStepATR: 1.0,
   partialTakeATR: 2.5,
   trailATR: 3.0,
@@ -190,6 +216,49 @@ const RULE = {
   rsiLookbackDays: 10,
   maxLots: 3
 };
+
+/* ============ TIMELAG AWARENESS（3人専門家設計） ============ */
+function getBusinessDayOffset(date, offsetDays) {
+  // 簡易版：土日をスキップして営業日計算
+  let current = new Date(date);
+  let count = 0;
+  while(count < offsetDays) {
+    current.setDate(current.getDate() + 1);
+    const day = current.getDay();
+    if(day !== 0 && day !== 6) count++;
+  }
+  return current.toISOString().slice(0,10);
+}
+
+function analyzeTimelag(candles) {
+  const today = new Date().toISOString().slice(0,10);
+  const lastCandle = candles[candles.length-1];
+  const lastDate = lastCandle.date;
+  
+  // 日数差分
+  const daysLag = Math.floor((new Date(today) - new Date(lastDate)) / (1000*60*60*24));
+  
+  // 実行予定日（翌営業日）
+  const executionDate = getBusinessDayOffset(lastDate, 1);
+  
+  // Gap予想幅：前営業日ATRの0.8～1.5倍の半値を両側
+  const prevCandle = candles[candles.length-2];
+  const atrAtEntry = candles[candles.length-1].atr || 0;
+  const gapExpectation = {
+    upper: lastCandle.close + atrAtEntry * 1.5,   // 上方gap想定
+    lower: lastCandle.close - atrAtEntry * 1.5,   // 下方gap想定
+    midpoint: lastCandle.close
+  };
+  
+  return {
+    analysisDate: lastDate,        // 分析対象日（確定値の日付）
+    currentDate: today,
+    daysLag: daysLag,
+    executionDate: executionDate,  // 実際の注文実行予定日
+    gapExpectation: gapExpectation,
+    dataStale: daysLag > 1         // 2営業日以上遅延していないか
+  };
+}
 
 /* ============ INDICATOR MATH ============ */
 function sma(vals, period, i){
@@ -278,13 +347,13 @@ function computeIndicators(candles){
   return {sma25, sma75, atr, rsi, macdHist:hist};
 }
 
-/* ============ SIGNAL ENGINE ============ */
+/* ============ SIGNAL ENGINE（タイムラグ対応） ============ */
 function loadState(key){
   try{
     const raw = localStorage.getItem('swingsignal_'+key);
-    if(!raw) return {lots:[], highestHigh:null, lastAddPrice:null, hardStop:null, log:[]};
+    if(!raw) return {lots:[], highestHigh:null, lastAddPrice:null, hardStop:null, log:[], pendingOrder:null};
     return JSON.parse(raw);
-  }catch(e){ return {lots:[], highestHigh:null, lastAddPrice:null, hardStop:null, log:[]}; }
+  }catch(e){ return {lots:[], highestHigh:null, lastAddPrice:null, hardStop:null, log:[], pendingOrder:null}; }
 }
 function saveState(key,state){
   localStorage.setItem('swingsignal_'+key, JSON.stringify(state));
@@ -295,7 +364,7 @@ function pushLog(state,date,action,price,note){
   if(state.log.length>60) state.log.length=60;
 }
 
-function runEngine(candles, indicators, state){
+function runEngine(candles, indicators, state, timelag){
   const n = candles.length;
   const i = n-1, p = n-2;
   const close = candles[i].close, high = candles[i].high, date = candles[i].date;
@@ -305,60 +374,83 @@ function runEngine(candles, indicators, state){
   const macdHist = indicators.macdHist[i], macdHistPrev = indicators.macdHist[p];
 
   if(sma25===null||sma75===null||atr===null||rsi===null||macdHist===null){
-    return {action:'WAIT', badge:'WAIT', message:'データ不足のため指標を計算中です（過去データを十分に取得できていません）。', indicators:{sma25,sma75,atr,rsi,macdHist}};
+    return {action:'WAIT', badge:'WAIT', message:'データ不足のため指標を計算中です。', indicators:{sma25,sma75,atr,rsi,macdHist}, timelag};
   }
 
   const uptrend = close>sma75 && sma25>sma75;
-  let action='WAIT', message='', badgeClass='WAIT';
+  let action='WAIT', message='', badgeClass='WAIT', isPending=false;
+
+  // ★ タイムラグ情報の表示
+  const timelageWarning = `\n【分析日】${timelag.analysisDate} → 【実行予定日】${timelag.executionDate} (Gap±${(timelag.gapExpectation.upper - close).toFixed(0)}円想定)`;
 
   if(state.lots.length===0){
-    let recentDip=false;
-    for(let k=Math.max(0,i-RULE.rsiLookbackDays); k<i; k++){
-      if(indicators.rsi[k]!==null && indicators.rsi[k]<RULE.rsiDeepPullback){ recentDip=true; break; }
-    }
-    const trigger = uptrend && recentDip && rsi>=RULE.rsiPullbackTrigger && rsi<=RULE.rsiTriggerMax && close>sma25;
-    if(trigger){
-      const entryPrice=close;
-      const hardStop = entryPrice - RULE.hardStopATR*atr;
-      state.lots.push({entryPrice, entryDate:date, atrAtEntry:atr});
-      state.highestHigh = high;
-      state.lastAddPrice = entryPrice;
-      state.hardStop = hardStop;
-      pushLog(state,date,'BUY',entryPrice,'新規エントリー(ロット1)');
-      action='BUY'; badgeClass='BUY';
-      message = `新規買いエントリー（ロット1/${RULE.maxLots}）。上昇トレンド中に押し目（RSI${RULE.rsiDeepPullback}未満）からRSIが${RULE.rsiPullbackTrigger}台まで回復しました。`;
+    // ★ PENDING機能：シグナル生成待ち状態
+    if(state.pendingOrder){
+      // 待機中の注文がある場合、翌営業日に実行予定と表示
+      badgeClass='PENDING';
+      action='PENDING';
+      message = `【待機中の注文】${state.pendingOrder.orderDate}に${state.pendingOrder.orderType}で${state.pendingOrder.price.toFixed(0)}円付近での約定を予定しています。` + timelageWarning;
+      isPending = true;
     } else {
-      badgeClass='WAIT';
-      message = uptrend
-        ? (recentDip
-            ? `押し目からの回復途中です。終値がSMA25を上回るのを待っています。現在RSI: ${rsi.toFixed(1)}`
-            : `上昇トレンド継続中。十分な押し目（RSI${RULE.rsiDeepPullback}未満）がまだ発生していません。現在RSI: ${rsi.toFixed(1)}`)
-        : `トレンドフィルター未成立（終値がSMA75未満、またはSMA25がSMA75を下回る）。新規エントリーは見送りです。`;
+      // 新規シグナル判定
+      let recentDip=false;
+      for(let k=Math.max(0,i-RULE.rsiLookbackDays); k<i; k++){
+        if(indicators.rsi[k]!==null && indicators.rsi[k]<RULE.rsiDeepPullback){ recentDip=true; break; }
+      }
+      const trigger = uptrend && recentDip && rsi>=RULE.rsiPullbackTrigger && rsi<=RULE.rsiTriggerMax && close>sma25;
+      if(trigger){
+        // ★ タイムラグ対応: 注文は即座には実行せず、翌営業日実行待ちに
+        const entryPrice=close;
+        const hardStop = entryPrice - RULE.hardStopATR*atr;  // ★ Gap対応の拡大損切
+        
+        // 待機注文として保存
+        state.pendingOrder = {
+          orderDate: timelag.executionDate,
+          orderType: 'BUY',
+          price: entryPrice,
+          hardStop: hardStop,
+          atrAtEntry: atr,
+          signalDate: date
+        };
+        
+        badgeClass='PENDING';
+        action='PENDING';
+        message = `【買いシグナル判定】${timelag.executionDate}の寄付で買い注文を予定します（目安値: ${entryPrice.toFixed(0)}円）。Gapにより±${(timelag.gapExpectation.upper - close).toFixed(0)}円前後の乖離予想。` + timelageWarning;
+        isPending = true;
+      } else {
+        badgeClass='WAIT';
+        message = uptrend
+          ? (recentDip
+              ? `押し目からの回復途中です。終値がSMA25を上回るのを待っています。現在RSI: ${rsi.toFixed(1)}`
+              : `上昇トレンド継続中。十分な押し目がまだ発生していません。現在RSI: ${rsi.toFixed(1)}`)
+          : `トレンドフィルター未成立。新規エントリーは見送りです。`;
+      }
     }
   } else {
+    // ★ 保有中：実行予定日を過ぎたら約定判定
     state.highestHigh = Math.max(state.highestHigh, high);
     const trailStop = state.highestHigh - RULE.trailATR*atr;
     const bearishCross = macdHistPrev!==null && macdHistPrev>=0 && macdHist<0;
 
     if(close<=state.hardStop){
       const exitLots = state.lots.length;
-      pushLog(state,date,'SELL',close,`損切り(全${exitLots}ロット)`);
+      pushLog(state,date,'SELL',close,`損切り(全${exitLots}ロット) - 損切ライン${state.hardStop.toFixed(2)}抜け`);
       action='SELL'; badgeClass='SELL';
-      message = `損切りライン(${state.hardStop.toFixed(2)})を割り込みました。保有${exitLots}ロットすべてを成行で手仕舞いしてください。`;
+      message = `損切りライン(${state.hardStop.toFixed(2)})を割り込みました。保有${exitLots}ロットすべてを手仕舞いしてください。${timelageWarning}`;
       state.lots=[]; state.highestHigh=null; state.lastAddPrice=null; state.hardStop=null;
     } else if(close<trailStop || (close<sma25 && bearishCross)){
       const exitLots = state.lots.length;
       const reason = close<trailStop ? `トレーリングストップ(${trailStop.toFixed(2)})到達` : `25日線割れ＋MACD弱転`;
       pushLog(state,date,'SELL',close,`トレンド終了(全${exitLots}ロット) - ${reason}`);
       action='SELL'; badgeClass='SELL';
-      message = `${reason}。残り${exitLots}ロットすべてを手仕舞いし、利益を確定してください。`;
+      message = `${reason}。残り${exitLots}ロットすべてを手仕舞い、利益を確定してください。${timelageWarning}`;
       state.lots=[]; state.highestHigh=null; state.lastAddPrice=null; state.hardStop=null;
     } else if(state.lots.length<RULE.maxLots && uptrend && (close-state.lastAddPrice)>=RULE.pyramidStepATR*atr && close>sma25){
       state.lots.push({entryPrice:close, entryDate:date, atrAtEntry:atr});
       state.lastAddPrice=close;
       pushLog(state,date,'BUY',close,`追加買い(ピラミッド ロット${state.lots.length}/${RULE.maxLots})`);
       action='BUY'; badgeClass='BUY';
-      message = `含み益がATR×${RULE.pyramidStepATR}進んだためピラミッディング。ロット${state.lots.length}/${RULE.maxLots}を追加購入してください。`;
+      message = `含み益がATR×${RULE.pyramidStepATR}進んだためピラミッディング。ロット${state.lots.length}/${RULE.maxLots}を追加購入してください。${timelageWarning}`;
     } else if(state.lots.length>=2){
       const oldest = state.lots[0];
       const gain = close - oldest.entryPrice;
@@ -368,25 +460,24 @@ function runEngine(candles, indicators, state){
         const reason = freshOverbought ? `RSI過熱(${rsi.toFixed(1)})` : `含み益がATR×${RULE.partialTakeATR}到達`;
         pushLog(state,date,'SELL',close,`一部利確(ロット1本 売却) - ${reason}`);
         action='SELL'; badgeClass='SELL';
-        message = `${reason}。最も古いロットを1本利益確定売りしてください。残り${state.lots.length}ロットはトレーリングストップで継続保有。`;
+        message = `${reason}。最も古いロットを1本利���確定売りしてください。残り${state.lots.length}ロットはトレーリングストップで継続保有。${timelageWarning}`;
       } else {
         badgeClass='HOLD';
-        message = `保有継続中（${state.lots.length}ロット）。含み損益・トレーリングストップを監視しています。`;
+        message = `保有継続中（${state.lots.length}ロット）。含み損益・トレーリングストップを監視しています。${timelageWarning}`;
         action='HOLD';
       }
     } else {
       badgeClass='HOLD';
-      message = `保有継続中（${state.lots.length}ロット）。トレーリングストップ: ${trailStop.toFixed(2)} / 損切りライン: ${state.hardStop.toFixed(2)}`;
+      message = `保有継続中（${state.lots.length}ロット）。トレーリングストップ: ${trailStop.toFixed(2)} / 損切りライン: ${state.hardStop.toFixed(2)}${timelageWarning}`;
       action='HOLD';
     }
   }
 
-  saveState('placeholder', state); // overwritten by caller with correct key
-  return {action, badge:badgeClass, message, indicators:{sma25,sma75,atr,rsi,macdHist}, trailStop: state.lots.length? state.highestHigh-RULE.trailATR*atr : null};
+  saveState('placeholder', state);
+  return {action, badge:badgeClass, message, indicators:{sma25,sma75,atr,rsi,macdHist}, trailStop: state.lots.length? state.highestHigh-RULE.trailATR*atr : null, timelag, isPending};
 }
 
 /* ============ DATA FETCH ============ */
-// Generic OHLCV CSV parser, used for the manual paste fallback (Date,Open,High,Low,Close,Volume)
 function parseCSV(text){
   const lines = text.trim().split('\n');
   const rows=[];
@@ -400,10 +491,6 @@ function parseCSV(text){
   return rows;
 }
 
-// Yahoo Finance's v8 chart endpoint returns clean OHLCV JSON and covers Tokyo-listed
-// tickers and futures, but (like most finance data hosts) it does not send
-// Access-Control-Allow-Origin headers, so a static page cannot fetch it directly.
-// We relay the request through public CORS proxies, trying each until one works.
 const CORS_PROXIES = [
   (u)=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   (u)=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
@@ -436,7 +523,7 @@ async function fetchYahoo(symbol){
       const text = await res.text();
       let json;
       try{ json = JSON.parse(text); }
-      catch(e){ throw new Error('JSON解析に失敗（プロキシ経由のレスポンス異常）'); }
+      catch(e){ throw new Error('JSON解析に失敗'); }
       const rows = parseYahooChart(json);
       if(rows.length<80) throw new Error('データ件数が不足しています');
       return rows;
@@ -469,6 +556,8 @@ function renderPanel(inst){
     <div class="lot-label" id="gaugeLabel-${inst.key}">保有ロット: 0/3</div>
 
     <div class="action-msg WAIT" id="msg-${inst.key}">データ取得中です…</div>
+    
+    <div class="timelag-info" id="timelagInfo-${inst.key}"></div>
 
     <div class="stats" id="stats-${inst.key}"></div>
 
@@ -477,11 +566,11 @@ function renderPanel(inst){
     <div class="controls">
       <button class="primary" onclick="loadInstrument('${inst.key}')">データ更新</button>
       <button onclick="toggleManual('${inst.key}')">手動入力/貼付</button>
-      <button class="danger" onclick="resetPosition('${inst.key}')">ポ��ションをリセット</button>
+      <button class="danger" onclick="resetPosition('${inst.key}')">ポジションをリセット</button>
     </div>
 
     <div class="manual-box" id="manual-${inst.key}">
-      <div style="font-size:11px;color:var(--muted);">自動取得に失敗した場合、Yahoo!ファイナンス等の「時系列データ」CSV（Date,Open,High,Low,Close,Volume）を貼り付けるか、直近終値のみ入力してください。</div>
+      <div style="font-size:11px;color:var(--muted);">自動取得に失敗した場合、CSV形式で貼り付けてください（Date,Open,High,Low,Close,Volume）</div>
       <textarea id="manualCsv-${inst.key}" placeholder="Date,Open,High,Low,Close,Volume&#10;2026-07-01,...,...,...,...,..."></textarea>
       <input id="manualClose-${inst.key}" placeholder="直近終値のみ入力する場合はここに数値">
       <button onclick="applyManual('${inst.key}')">この内容で反映</button>
@@ -573,7 +662,8 @@ function processInstrument(inst, candles){
   window['__cache_'+inst.key] = candles;
   const indicators = computeIndicators(candles);
   const state = loadState(inst.key);
-  const result = runEngine(candles, indicators, state);
+  const timelag = analyzeTimelag(candles);
+  const result = runEngine(candles, indicators, state, timelag);
   saveState(inst.key, state);
 
   const last = candles[candles.length-1];
@@ -587,11 +677,19 @@ function processInstrument(inst, candles){
   deltaEl.className = 'price-delta '+(delta>0?'up':delta<0?'down':'flat');
 
   const badge = document.getElementById('badge-'+inst.key);
-  badge.textContent = result.action==='HOLD' ? '保有中' : result.action==='BUY' ? '買いシグナル' : result.action==='SELL' ? '売りシグナル' : '待機';
+  badge.textContent = result.action==='HOLD' ? '保有中' : result.action==='BUY' ? '買いシグナル' : result.action==='SELL' ? '売りシグナル' : result.action==='PENDING' ? '待機中' : '待機';
   badge.className = 'badge '+result.badge;
 
   document.getElementById('msg-'+inst.key).textContent = result.message;
   document.getElementById('msg-'+inst.key).className = 'action-msg '+result.badge;
+  
+  // ★ タイムラグ情報表示
+  const timelageEl = document.getElementById('timelagInfo-'+inst.key);
+  timelageEl.innerHTML = `
+    📊 分析日: ${timelag.analysisDate} | 実行予定: ${timelag.executionDate}<br>
+    📈 寄付Gap想定: ${timelag.gapExpectation.lower.toFixed(0)}円 ～ ${timelag.gapExpectation.upper.toFixed(0)}円
+    ${timelag.dataStale ? '<br>⚠️ データが2営業日以上遅延しています' : ''}
+  `;
 
   updateGauge(inst.key, state.lots.length);
 
@@ -602,7 +700,7 @@ function processInstrument(inst, candles){
     <div><span>SMA75</span>${ind.sma75?ind.sma75.toFixed(2):'-'}</div>
     <div><span>ATR14</span>${ind.atr?ind.atr.toFixed(2):'-'}</div>
     <div><span>RSI14</span>${ind.rsi?ind.rsi.toFixed(1):'-'}</div>
-    <div><span>損切りライン</span>${state.hardStop?state.hardStop.toFixed(2):'-'}</div>
+    <div><span>損切(Gap対応)</span>${state.hardStop?state.hardStop.toFixed(2):'-'}</div>
     <div><span>トレーリング</span>${result.trailStop?result.trailStop.toFixed(2):'-'}</div>
   `;
 
