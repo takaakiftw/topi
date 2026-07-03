@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Swing Signal Terminal | TOPIX(1306) × Gold(314A)</title>
+<title>Swing Signal Terminal | TOPIX(1306)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
@@ -52,7 +52,7 @@ body{
 }
 .rules-note b{color:var(--text);}
 .grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:20px;
+  display:grid;grid-template-columns:1fr;gap:20px;
 }
 @media (max-width:880px){.grid{grid-template-columns:1fr;}}
 
@@ -150,15 +150,15 @@ a{color:var(--accent);}
 
 <div class="container">
   <div class="rules-note">
-    <b>ルール概要:</b> トレンドフィルター（SMA25/75）が上向きの時のみ押し目からの反発でエントリー（1ロット）。含み益がATRの1倍進むごとに追加購入（最大3ロット）でピラミッディング。含み益がATRの2.5倍に到達した古いロットから利益確定売り。損切りは初回エントリーからATRの1.5倍下、または25日線割れ＋MACD弱転で残りロットを手仕舞い。<b>空売りは行いません（買い・利確・損切りのみ）。</b>
-    データは日次終値ベース（前営業日終了時点）。ザラ場リアルタイムのティックではなく、スイング向けの日足シグナルです。314Aは上場来が短いため、価格連動性の高い金先物価格（GC=F・米ドル建て）で代用してシグナルを算出しています。データはYahoo!ファイナンスのチャートAPIを無料の中継サーバー（CORSプロキシ）経由で取得しています。ブラウザから金融データサイトへ直接アクセスするとCORS制限で拒否されるため、静的サイトではこの方式が最も現実的ですが、中継サーバーが一時的に不調な場合は自動取得に失敗することがあります。その場合は各カードの「手動入力/貼付」をご利用ください。</div>
+    <b>ルール概要:</b> トレンドフィルター（SMA25/75）が上向きの時のみ押し目からの反発でエントリー（1ロット）。含み益がATRの1倍進むごとに追加（最大3ロット）。古いロットから部分利確または全体ストップアウト。データは日次終値ベース（前営業日終了時点）。ザラ場リアルタイムのティックではなく、スイング向けの日足シグナルです。
+  </div>
 
   <div class="grid" id="panels"></div>
 </div>
 
 <div class="footer">
   <h3>免責事項</h3>
-  本アプリは特定の売買を推奨するものではなく、教育・検証目的のテクニカルシグナル表示ツールです。投資判断はご自身の責任で行ってください。データ取得元（Yahoo!ファイナンス、および中継に用いる無料CORSプロキシ）の遅延・欠損・仕様変更・一時停止により、シグナルが実際の市況と乖離したり自動取得が失敗したりする可能性があります。ブラウザのlocalStorageにポジション状態を保存しているため、端末やブラウザを変えると保有ロット状況は引き継がれません。
+  本アプリは特定の売買を推奨するものではなく、教育・検証目的のテクニカルシグナル表示ツールです。投資判断はご自身の責任で行ってください。
 </div>
 
 <script>
@@ -171,14 +171,6 @@ const INSTRUMENTS = [
     yahooSymbol: '1306.T',
     currency: '円',
     note: 'TOPIX ETF（東証）'
-  },
-  {
-    key: '314A',
-    name: 'ゴールドETF（金価格代用）',
-    ticker: '314A',
-    yahooSymbol: 'GC=F',
-    currency: 'USD/oz',
-    note: '314Aは上場来データ不足のため金先物価格(GC=F/USD)で代替算出'
   }
 ];
 
@@ -334,7 +326,7 @@ function runEngine(candles, indicators, state){
       state.hardStop = hardStop;
       pushLog(state,date,'BUY',entryPrice,'新規エントリー(ロット1)');
       action='BUY'; badgeClass='BUY';
-      message = `新規買いエントリー（ロット1/${RULE.maxLots}）。上昇トレンド中に押し目（RSI${RULE.rsiDeepPullback}未満）からRSIが${RULE.rsiPullbackTrigger}台まで回復し、終値がSMA25を上回りました。損切りライン: ${hardStop.toFixed(2)}（ATR×${RULE.hardStopATR}下）。`;
+      message = `新規買いエントリー（ロット1/${RULE.maxLots}）。上昇トレンド中に押し目（RSI${RULE.rsiDeepPullback}未満）からRSIが${RULE.rsiPullbackTrigger}台まで回復しました。`;
     } else {
       badgeClass='WAIT';
       message = uptrend
@@ -632,7 +624,7 @@ async function loadInstrument(key){
     showError(key, e.message);
     document.getElementById('badge-'+key).textContent='取得失敗';
     document.getElementById('badge-'+key).className='badge SELL';
-    document.getElementById('msg-'+key).textContent = 'データの自動取得に失敗しました。ネットワーク/CORS設定、またはシンボル指定をご確認のうえ、下部の「手動入力/貼付」もご利用いただけます。';
+    document.getElementById('msg-'+key).textContent = 'データの自動取得に失敗しました。ネットワーク/CORS設定、またはシンボル指定をご確認のうえ、下部の「手動入力/貼付」から続行できます。';
   }
 }
 
